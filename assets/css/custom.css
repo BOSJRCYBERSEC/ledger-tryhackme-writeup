@@ -1,3 +1,15 @@
 body {
-  font-size: 12px; /* ou 16px, etc. */
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+h1, h2, h3 {
+  color: #005f73;
+}
+
+code {
+  background-color: #f4f4f4;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 90%;
 }

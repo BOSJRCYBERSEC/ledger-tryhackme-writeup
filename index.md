@@ -1,4 +1,3 @@
-Voici ton texte formaté en Markdown clair, prêt à être publié sur GitHub Pages ou un site Jekyll :
 
 ```markdown
 # TryHackMe - Ledger – Write-up Complet (FR)

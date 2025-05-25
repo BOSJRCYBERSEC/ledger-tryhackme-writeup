@@ -1,4 +1,5 @@
-theme: minimal-mistakes-jekyll
+theme: jekyll-theme-cayman
+
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
@@ -6,6 +7,5 @@ plugins:
 defaults:
   - scope:
       path: ""
-      type: "pages"
     values:
       css: "/assets/css/custom.css"

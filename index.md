@@ -1,7 +1,6 @@
 
 ---
 
-# Exemple de reformattage Markdown (extrait de ton write-up)
 
 ````markdown
 # 🧾 TryHackMe - Ledger – Write-up Complet (FR)

